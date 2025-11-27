@@ -4,7 +4,7 @@ Copy-paste directly into your `README.md`.
 
 ---
 
-```md
+
 <h1 align="center">🚀 Custom Redis Server (C++17)</h1>
 
 <p align="center">
