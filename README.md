@@ -1,10 +1,3 @@
-Below is your **updated professional README.md** with **badges, branding, installation badges, Docker badges, CI/CD badges**, and a polished top-level header.
-
-Copy-paste directly into your `README.md`.
-
----
-
-
 <h1 align="center">🚀 Custom Redis Server (C++17)</h1>
 
 <p align="center">
