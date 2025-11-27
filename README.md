@@ -25,12 +25,12 @@
 
 This project is a **production-grade, high-performance, Redis-like server** implemented entirely in **C++17**, designed for:
 
-- Custom caching backend for MERN, Go, Python, or C++ services  
-- URL shortener microservices  
-- Queueing systems  
-- In-memory analytics store  
-- Local development Redis alternative  
-- Learning low-level systems programming  
+- Custom caching backend for MERN, Go, Python, or C++ services
+- URL shortener microservices
+- Queueing systems
+- In-memory analytics store
+- Local development Redis alternative
+- Learning low-level systems programming
 
 It supports **multi-client concurrency**, **RESP protocol**, **key expiration**, **disk persistence**, **list + hash operations**, and a **high-throughput async logger**.
 
@@ -39,38 +39,45 @@ It supports **multi-client concurrency**, **RESP protocol**, **key expiration**,
 ## ✨ Features
 
 ### ⚙ Redis-Compatible Operations
+
 - **Strings**: `SET`, `GET`, `DEL`, `TYPE`, `EXPIRE`, `RENAME`
 - **Lists**: `LPUSH`, `RPUSH`, `LPOP`, `RPOP`, `LLEN`, `LGET`, `LREM`, `LINDEX`, `LSET`
 - **Hashes**: `HSET`, `HGET`, `HMSET`, `HGETALL`, `HKEYS`, `HVALS`, `HDEL`, `HEXISTS`, `HLEN`
 
 ### ⚡ RESP Protocol (Zero-Copy Parsing)
-- Built using `string_view`  
-- Supports pipelining  
-- No extra allocations → high performance  
+
+- Built using `string_view`
+- Supports pipelining
+- No extra allocations → high performance
 
 ### 🔄 Persistence (RDB-style)
+
 - Auto-saves every **5 minutes**
-- Save on shutdown  
-- Loads at server startup  
+- Save on shutdown
+- Loads at server startup
 
 ### 🧵 Thread-Safe Engine
-- Mutex-protected data stores  
-- Ready for 1000+ concurrent clients  
+
+- Mutex-protected data stores
+- Ready for 1000+ concurrent clients
 
 ### 🕒 TTL Expiration Engine
+
 - Accurate expiry using `steady_clock`
-- Handles millions of keys efficiently  
+- Handles millions of keys efficiently
 
 ### 📝 Asynchronous Logger
-- Background log thread  
-- 256-line batching  
-- Hourly rotation  
-- Logs stored in `logs/redis-*.log`  
+
+- Background log thread
+- 256-line batching
+- Hourly rotation
+- Logs stored in `logs/redis-*.log`
 
 ### 🐳 Docker-Ready + Render Deployable
-- `Dockerfile` included  
-- `render.yaml` included  
-- Easy cloud hosting  
+
+- `Dockerfile` included
+- `render.yaml` included
+- Easy cloud hosting
 
 ---
 
@@ -100,16 +107,17 @@ It supports **multi-client concurrency**, **RESP protocol**, **key expiration**,
 ├── render.yaml
 └── README.md
 
-````
+```
 
 ---
 
 ## 🛠 Build & Run
 
 ### Build (Linux or WSL)
+
 ```bash
 g++ -std=c++17 -O2 -pthread -Iinclude src/*.cpp -o my_redis_server
-````
+```
 
 ### Run the server
 
@@ -134,14 +142,14 @@ const net = require("net");
 
 function resp(arr) {
   let out = `*${arr.length}\r\n`;
-  arr.forEach(arg => out += `$${arg.length}\r\n${arg}\r\n`);
+  arr.forEach((arg) => (out += `$${arg.length}\r\n${arg}\r\n`));
   return out;
 }
 
 async function redisSend(client, arr) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     client.write(resp(arr));
-    client.once("data", x => resolve(x.toString()));
+    client.once("data", (x) => resolve(x.toString()));
   });
 }
 
@@ -241,6 +249,25 @@ tcp://your-service-ip:6379
 
 ## 🧑‍💻 Author
 
-Built for systems engineering, backend architecture, and performance research.
+**Chandi Charan Mahato**  
+Software Engineer | Systems Developer | Backend Architect
 
+I build high-performance distributed systems, developer tools, and backend infrastructure.  
+This project was developed to explore:
 
+- Low-level systems programming (C++17)
+- In-memory database design
+- Network servers using TCP sockets
+- Redis protocol (RESP) implementation
+- High-throughput logging and concurrency models
+- Production-grade performance engineering
+
+If you're interested in collaborations, improvements, or using this custom Redis server in your own project, feel free to reach out.
+
+### 🔗 Connect with me
+
+- **GitHub**: https://github.com/chandi977
+- **LinkedIn**: https://www.linkedin.com/in/chandi-charan-mahato-3631a7178
+- **Email**: charan.f.sde@gmail.com
+
+---
