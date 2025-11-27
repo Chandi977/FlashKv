@@ -1,0 +1,38 @@
+name: Deploy to Render
+
+on:
+  push:
+    branches:
+      - main # Deploy only when pushing to main
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Optional: Install dependencies before deploy
+      # If you want to lint/test before deployment
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install deps
+        run: npm install
+
+      - name: Run tests (optional)
+        run: npm test --if-present
+
+      # ------------------------------------------------------
+      # 🔥 TRIGGER RENDER DEPLOY HOOK
+      # ------------------------------------------------------
+      - name: Trigger Render Deploy Hook
+        run: |
+          curl -X POST "https://api.render.com/deploy/srv-d4k3hvc9c44c73eml240?key=Ahvo2l4zDls"
+
+      - name: Deployment Triggered
+        run: echo "Render deployment successfully triggered!"
