@@ -13,7 +13,9 @@
 #include <unistd.h>
 #endif
 
-// Helper function to connect to Redis server
+// ----------------------------------------------------------
+// CONNECT TO SERVER
+// ----------------------------------------------------------
 int connectToServer(const std::string &host, int port)
 {
 #ifdef _WIN32
@@ -42,47 +44,117 @@ int connectToServer(const std::string &host, int port)
     return sock;
 }
 
-// Send RESP formatted command
-void sendCommand(int sock, const std::string &cmd)
+// ----------------------------------------------------------
+// SEND RESP COMMAND
+// ----------------------------------------------------------
+std::string sendCommand(int sock, const std::string &cmd)
 {
     send(sock, cmd.c_str(), cmd.size(), 0);
 
-    char buffer[2048];
+    char buffer[4096];
     memset(buffer, 0, sizeof(buffer));
     int bytes = recv(sock, buffer, sizeof(buffer) - 1, 0);
 
     if (bytes > 0)
-        std::cout << "[SERVER] " << buffer << std::endl;
-    else
-        std::cout << "Server closed connection\n";
+        return std::string(buffer, bytes);
+
+    return "ERR: No response";
 }
 
-// Worker thread test
+// RESP builders
+std::string respArray(const std::vector<std::string> &parts)
+{
+    std::string out = "*" + std::to_string(parts.size()) + "\r\n";
+    for (const auto &p : parts)
+    {
+        out += "$" + std::to_string(p.size()) + "\r\n" + p + "\r\n";
+    }
+    return out;
+}
+
+// ----------------------------------------------------------
+// MEANINGFUL INDIVIDUAL TESTS
+// ----------------------------------------------------------
+
+// Test 1: PING & ECHO
+void testPingEcho(int sock)
+{
+    std::cout << "\n[TEST] PING/ECHO\n";
+    std::cout << sendCommand(sock, respArray({"PING"}));
+    std::cout << sendCommand(sock, respArray({"ECHO", "Hello Redis"}));
+}
+
+// Test 2: SET/GET correctness
+void testSetGet(int sock)
+{
+    std::cout << "\n[TEST] SET/GET\n";
+    std::cout << sendCommand(sock, respArray({"SET", "testKey", "12345"}));
+    std::cout << sendCommand(sock, respArray({"GET", "testKey"}));
+}
+
+// Test 3: Atomic increment simulation (LPUSH + LLEN)
+void testAtomicIncrement(int sock)
+{
+    std::cout << "\n[TEST] Atomic List Increment\n";
+
+    // Push value
+    sendCommand(sock, respArray({"LPUSH", "counterList", "X"}));
+
+    // Read list size
+    std::cout << "LLEN: ";
+    std::cout << sendCommand(sock, respArray({"LLEN", "counterList"}));
+}
+
+// Test 4: List operations
+void testListOps(int sock)
+{
+    std::cout << "\n[TEST] LIST Operations\n";
+    sendCommand(sock, respArray({"DEL", "myList"}));
+    std::cout << sendCommand(sock, respArray({"LPUSH", "myList", "A"}));
+    std::cout << sendCommand(sock, respArray({"RPUSH", "myList", "B"}));
+    std::cout << sendCommand(sock, respArray({"LGET", "myList"}));
+}
+
+// Test 5: Hash operations
+void testHashOps(int sock)
+{
+    std::cout << "\n[TEST] HASH Operations\n";
+    sendCommand(sock, respArray({"DEL", "user:1"}));
+    std::cout << sendCommand(sock, respArray({"HSET", "user:1", "name", "Alice"}));
+    std::cout << sendCommand(sock, respArray({"HSET", "user:1", "age", "22"}));
+    std::cout << sendCommand(sock, respArray({"HGETALL", "user:1"}));
+}
+
+// Test 6: Expiry behavior
+void testExpire(int sock)
+{
+    std::cout << "\n[TEST] EXPIRY\n";
+    std::cout << sendCommand(sock, respArray({"SET", "tempkey", "temporary"}));
+    std::cout << sendCommand(sock, respArray({"EXPIRE", "tempkey", "1"})); // expire in 1 sec
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+    std::cout << sendCommand(sock, respArray({"GET", "tempkey"})); // should return nil
+}
+
+// ----------------------------------------------------------
+// WORKER THREAD (for concurrency showcase)
+// ----------------------------------------------------------
 void workerThread(int id)
 {
     int sock = connectToServer("127.0.0.1", 6379);
     if (sock < 0)
         return;
 
-    std::cout << "Client " << id << " connected\n";
-
-    // Test PING
-    sendCommand(sock, "*1\r\n$4\r\nPING\r\n");
-
-    // Test SET
     std::string key = "client" + std::to_string(id);
     std::string value = "value" + std::to_string(id);
 
-    std::string setCmd = "*3\r\n$3\r\nSET\r\n$" + std::to_string(key.size()) + "\r\n" +
-                         key + "\r\n$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
+    // SET
+    sendCommand(sock, respArray({"SET", key, value}));
 
-    sendCommand(sock, setCmd);
+    // GET
+    std::string resp = sendCommand(sock, respArray({"GET", key}));
+    std::cout << "[Thread " << id << "] GET -> " << resp;
 
-    // Test GET
-    std::string getCmd = "*2\r\n$3\r\nGET\r\n$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
-    sendCommand(sock, getCmd);
-
-    // Close connection
 #ifdef _WIN32
     closesocket(sock);
 #else
@@ -90,19 +162,36 @@ void workerThread(int id)
 #endif
 }
 
+// ----------------------------------------------------------
+// MAIN
+// ----------------------------------------------------------
 int main()
 {
-    // Launch 5 concurrent clients
-    std::cout << "Starting Redis concurrency test...\n";
+    std::cout << "\n========= CUSTOM REDIS SERVER TEST SUITE =========\n";
 
+    int sock = connectToServer("127.0.0.1", 6379);
+    if (sock < 0)
+        return 0;
+
+    // Run comprehensive tests
+    testPingEcho(sock);
+    testSetGet(sock);
+    testListOps(sock);
+    testHashOps(sock);
+    testExpire(sock);
+    testAtomicIncrement(sock);
+
+    // ----------------------------------------------
+    // Concurrency showcase (10 threads)
+    // ----------------------------------------------
+    std::cout << "\n[TEST] Concurrency Showcase (10 threads)\n";
     std::vector<std::thread> clients;
-
-    for (int i = 1; i <= 5; i++)
+    for (int i = 1; i <= 10; i++)
         clients.emplace_back(workerThread, i);
 
     for (auto &t : clients)
         t.join();
 
-    std::cout << "Concurrent test finished.\n";
+    std::cout << "\n========= TEST SUITE FINISHED =========\n";
     return 0;
 }
