@@ -271,3 +271,5 @@ If you're interested in collaborations, improvements, or using this custom Redis
 - **Email**: charan.f.sde@gmail.com
 
 ---
+
+g++ -std=c++17 -Iinclude src/\*.cpp -o my_redis_server -lws2_32 -pthread

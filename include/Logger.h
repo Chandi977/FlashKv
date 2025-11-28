@@ -1,4 +1,13 @@
 #pragma once
+
+// --- FIX WINDOWS MACRO COLLISION -----------------------------------
+#ifdef _WIN32
+#ifdef ERROR
+#undef ERROR
+#endif
+#endif
+// -------------------------------------------------------------------
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -10,7 +19,7 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <filesystem> // Added
+#include <filesystem>
 
 class Logger
 {
@@ -20,7 +29,7 @@ public:
         DEBUG = 0,
         INFO = 1,
         WARN = 2,
-        ERROR = 3,
+        ERROR = 3, // SAFE NOW (macro undef done above)
         OFF = 4
     };
 
@@ -91,7 +100,7 @@ private:
 
     Logger()
     {
-        std::filesystem::create_directory("logs"); // ensure logs folder exists
+        std::filesystem::create_directory("logs");
         worker = std::thread([this]()
                              { workerLoop(); });
     }
@@ -209,7 +218,6 @@ private:
 
             if (!it.tag.empty())
                 oss << "[" << it.tag << "]";
-
             if (!it.client.empty())
                 oss << "[" << it.client << "]";
 
@@ -218,6 +226,7 @@ private:
 
         std::lock_guard<std::mutex> lk(fileMutex);
         rotateFile(batch.front().tp);
+
         if (outFile.is_open())
         {
             outFile << oss.str();
@@ -251,7 +260,8 @@ private:
         currentHour = tm.tm_hour;
 
         std::ostringstream ss;
-        ss << "logs/redis-" << (tm.tm_year + 1900) << "-"
+        ss << "logs/redis-"
+           << (tm.tm_year + 1900) << "-"
            << std::setw(2) << std::setfill('0') << (tm.tm_mon + 1) << "-"
            << std::setw(2) << std::setfill('0') << tm.tm_mday << "-"
            << std::setw(2) << std::setfill('0') << tm.tm_hour

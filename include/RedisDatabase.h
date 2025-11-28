@@ -3,108 +3,109 @@
 
 #include <string>
 #include <vector>
+#include <deque>
 #include <unordered_map>
 #include <chrono>
 #include <mutex>
-#include <sys/types.h>
+#include <sys/types.h> // ssize_t on POSIX; on Windows you may need to typedef ssize_t
 
-/*
-  RedisDatabase — Phase-5 Optimized Header
-  ----------------------------------------
-  - String / List / Hash support
-  - TTL Expiry
-  - Single Global Mutex (Phase-1)
-  - Lock Striping Infrastructure (Phase-5, used in Phase-6)
-  - Zero-copy friendly, thread-safe design
-*/
-
+// Simple, thread-safe Redis-like in-memory DB. Single-shard for clarity.
 class RedisDatabase
 {
 public:
-  // Singleton instance
-  static RedisDatabase &getInstance();
+   // Singleton accessor
+   static RedisDatabase &getInstance();
 
-  // -------------------------------------------------------------------------
-  // Core Operations
-  // -------------------------------------------------------------------------
-  bool flushAll();
+   /* ============================================================
+      CORE OPERATIONS
+      ============================================================ */
+   bool flushAll();
 
-  // --- KeyValue ---
-  void set(const std::string &key, const std::string &value);
-  bool get(const std::string &key, std::string &value);
-  std::vector<std::string> keys();
-  std::string type(const std::string &key);
-  bool del(const std::string &key);
+   // Key-Value
+   void set(const std::string &key, const std::string &value);
+   bool get(const std::string &key, std::string &value);
+   std::vector<std::string> keys();
+   std::string type(const std::string &key);
+   bool del(const std::string &key);
 
-  bool expire(const std::string &key, int seconds);
-  void purgeExpired();
-  bool rename(const std::string &oldKey, const std::string &newKey);
+   bool expire(const std::string &key, int seconds);
+   int ttl(const std::string &key); // (-1 no TTL, -2 missing)
 
-  // -------------------------------------------------------------------------
-  // List Operations
-  // -------------------------------------------------------------------------
-  std::vector<std::string> lget(const std::string &key);
-  ssize_t llen(const std::string &key);
-  void lpush(const std::string &key, const std::string &value);
-  void rpush(const std::string &key, const std::string &value);
-  bool lpop(const std::string &key, std::string &value);
-  bool rpop(const std::string &key, std::string &value);
-  int lrem(const std::string &key, int count, const std::string &value);
-  bool lindex(const std::string &key, int index, std::string &value);
-  bool lset(const std::string &key, int index, const std::string &value);
+   void purgeExpired();
+   bool rename(const std::string &oldKey, const std::string &newKey);
 
-  // -------------------------------------------------------------------------
-  // Hash Operations
-  // -------------------------------------------------------------------------
-  bool hset(const std::string &key, const std::string &field, const std::string &value);
-  bool hget(const std::string &key, const std::string &field, std::string &value);
-  bool hexists(const std::string &key, const std::string &field);
-  bool hdel(const std::string &key, const std::string &field);
-  std::unordered_map<std::string, std::string> hgetall(const std::string &key);
-  std::vector<std::string> hkeys(const std::string &key);
-  std::vector<std::string> hvals(const std::string &key);
-  ssize_t hlen(const std::string &key);
-  bool hmset(const std::string &key, const std::vector<std::pair<std::string, std::string>> &fieldValues);
+   /* ============================================================
+      NUMERIC OPERATIONS
+      ============================================================ */
+   // Strict increment - throws on error (convenience)
+   long long incr(const std::string &key);
 
-  // -------------------------------------------------------------------------
-  // Persistence
-  // -------------------------------------------------------------------------
-  bool dump(const std::string &filename);
-  bool load(const std::string &filename);
+   // Safe INCR: returns false if value is non-integer; out contains new value when true
+   bool incr(const std::string &key, long long &out);
+
+   /* ============================================================
+      LIST OPERATIONS
+      ============================================================ */
+   std::vector<std::string> lget(const std::string &key);
+   ssize_t llen(const std::string &key);
+   void lpush(const std::string &key, const std::string &value);
+   void rpush(const std::string &key, const std::string &value);
+   bool lpop(const std::string &key, std::string &value);
+   bool rpop(const std::string &key, std::string &value);
+   int lrem(const std::string &key, int count, const std::string &value);
+   bool lindex(const std::string &key, int index, std::string &value);
+   bool lset(const std::string &key, int index, const std::string &value);
+
+   /* ============================================================
+      HASH OPERATIONS
+      ============================================================ */
+   bool hset(const std::string &key, const std::string &field, const std::string &value);
+   bool hget(const std::string &key, const std::string &field, std::string &value);
+   bool hexists(const std::string &key, const std::string &field);
+   bool hdel(const std::string &key, const std::string &field);
+
+   std::unordered_map<std::string, std::string> hgetall(const std::string &key);
+   std::vector<std::string> hkeys(const std::string &key);
+   std::vector<std::string> hvals(const std::string &key);
+   ssize_t hlen(const std::string &key);
+
+   bool hmset(const std::string &key,
+              const std::vector<std::pair<std::string, std::string>> &fieldValues);
+
+   /* ============================================================
+      PERSISTENCE
+      ============================================================ */
+   bool dump(const std::string &filename);
+   bool load(const std::string &filename);
 
 private:
-  // Hidden constructor / destructor
-  RedisDatabase() = default;
-  ~RedisDatabase() = default;
+   RedisDatabase() = default;
+   ~RedisDatabase() = default;
 
-  RedisDatabase(const RedisDatabase &) = delete;
-  RedisDatabase &operator=(const RedisDatabase &) = delete;
+   RedisDatabase(const RedisDatabase &) = delete;
+   RedisDatabase &operator=(const RedisDatabase &) = delete;
 
-  // -------------------------------------------------------------------------
-  // GLOBAL LOCK (Phase-1)
-  // -------------------------------------------------------------------------
-  std::mutex db_mutex;
+   /* ============================================================
+      INTERNAL STATE & HELPERS
+      ============================================================ */
+   std::mutex db_mutex; // global lock (simple and safe)
 
-  // -------------------------------------------------------------------------
-  // PHASE-5: Lock Striping Infrastructure (not yet activated)
-  // -------------------------------------------------------------------------
-  static constexpr int SHARD_COUNT = 32;
-  std::mutex shard_mutexes[SHARD_COUNT];
+   // core stores
+   std::unordered_map<std::string, std::string> kv_store;
+   std::unordered_map<std::string, std::deque<std::string>> list_store;
+   std::unordered_map<std::string, std::unordered_map<std::string, std::string>> hash_store;
 
-  inline size_t shardFor(const std::string &key) const noexcept
-  {
-    return std::hash<std::string>{}(key) & (SHARD_COUNT - 1);
-  }
+   // expiry: key -> wall-clock deadline (system_clock)
+   std::unordered_map<std::string, std::chrono::system_clock::time_point> expiry_map;
 
-  // -------------------------------------------------------------------------
-  // Primary Data Stores
-  // -------------------------------------------------------------------------
-  std::unordered_map<std::string, std::string> kv_store;
-  std::unordered_map<std::string, std::vector<std::string>> list_store;
-  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> hash_store;
+   // Expiry helpers
+   void maybeFullPurge();                          // rate-limited full sweep
+   void purgeExpired_locked();                     // purge (assumes db_mutex held)
+   bool purgeKeyIfExpired(const std::string &key); // per-key purge (caller acquires mutex)
+   bool checkExpired(const std::string &key);
 
-  // Expiry map
-  std::unordered_map<std::string, std::chrono::steady_clock::time_point> expiry_map;
+   // Small helper to convert ms timestamp -> time_point when loading
+   static std::chrono::system_clock::time_point tp_from_ms_since_epoch(long long ms);
 };
 
-#endif
+#endif // REDIS_DATABASE_H

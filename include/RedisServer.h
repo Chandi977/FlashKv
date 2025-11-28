@@ -3,34 +3,41 @@
 
 #include <string>
 #include <atomic>
+#include <memory>
 
-/*
-  RedisServer
-  --------------------------------------
-  - Clean and minimal public interface
-  - Atomic running flag for thread-safe shutdown
-  - Prepped for Phase-6: epoll/select optimization
-  - No unnecessary includes
-*/
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+using socket_t = SOCKET;
+static constexpr socket_t INVALID_SOCKET_T = INVALID_SOCKET;
+#else
+using socket_t = int;
+static constexpr socket_t INVALID_SOCKET_T = -1;
+#endif
+
+class ThreadPool; // Forward declaration
 
 class RedisServer
 {
 public:
-    explicit RedisServer(int port);
+  explicit RedisServer(int port);
+  ~RedisServer(); // Ensures proper cleanup
 
-    // Starts blocking accept() loop (multi-threaded clients)
-    void run();
+  // Start the server: blocking accept() loop
+  void run();
 
-    // Graceful shutdown (thread-safe)
-    void shutdown();
+  // Graceful shutdown: thread-safe
+  void shutdown();
 
 private:
-    int port = 0;
-    int server_socket = -1;
-    std::atomic<bool> running{false};
+  int port = 0;
+  socket_t server_socket = INVALID_SOCKET_T;
+  std::atomic<bool> running{false};
 
-    // For Ctrl+C, SIGINT, etc.
-    void setupSignalHandler();
+  std::unique_ptr<ThreadPool> thread_pool; // Multi-threading support
+
+  void setupSignalHandler();
+  void handleClient(socket_t client_fd);
 };
 
-#endif
+#endif // REDIS_SERVER_H
